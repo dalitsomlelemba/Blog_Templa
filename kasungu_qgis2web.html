@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Kasungu National Park — Wildlife Tracking</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Open Sans', Arial, sans-serif;
+    font-size: 12px;
+    background: #f5f5f5;
+    color: #333;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TITLE BAR — simple, like QGIS2Web default ── */
+  #title-bar {
+    background: #fff;
+    border-bottom: 1px solid #ccc;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    height: 44px;
+  }
+  #title-bar h1 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    letter-spacing: 0.3px;
+  }
+  #title-bar .subtitle {
+    font-size: 11px;
+    color: #888;
+  }
+  #live-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #555;
+  }
+  .live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #4caf50;
+  }
+
+  /* ── MAIN AREA ── */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── LEFT PANEL — QGIS layer control style ── */
+  #panel {
+    width: 220px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-section {
+    border-bottom: 1px solid #ddd;
+    padding: 10px 12px;
+  }
+
+  .panel-section h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+
+  /* Layer checkboxes — exactly like QGIS2Web layer panel */
+  .layer-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 12px;
+    color: #333;
+  }
+  .layer-row input[type="checkbox"] {
+    cursor: pointer;
+    width: 13px;
+    height: 13px;
+    accent-color: #4a90a4;
+  }
+  .layer-row .layer-sym {
+    width: 18px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .layer-row .layer-circle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(0,0,0,0.3);
+  }
+  .layer-row .layer-line {
+    width: 18px;
+    height: 3px;
+    border-radius: 1px;
+    flex-shrink: 0;
+  }
+  .layer-name {
+    flex: 1;
+    user-select: none;
+  }
+
+  /* ── LEGEND section ── */
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 0;
+    font-size: 11px;
+    color: #444;
+  }
+  .leg-box {
+    width: 18px; height: 12px;
+    border-radius: 2px;
+    border: 1px solid rgba(0,0,0,0.2);
+    flex-shrink: 0;
+  }
+  .leg-circle {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,0,0,0.3);
+    flex-shrink: 0;
+  }
+  .leg-line {
+    width: 18px; height: 3px;
+    border-radius: 1px;
+    flex-shrink: 0;
+  }
+
+  /* ── SELECTED FEATURE INFO (bottom of panel) ── */
+  #info-box {
+    flex: 1;
+    padding: 10px 12px;
+    overflow-y: auto;
+    background: #fafafa;
+  }
+  #info-box h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  #info-content {
+    font-size: 11px;
+    color: #555;
+    line-height: 1.6;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    border-bottom: 1px solid #eee;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-key { color: #888; }
+  .info-val { color: #333; font-weight: 600; }
+  .info-placeholder {
+    color: #aaa;
+    font-style: italic;
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  /* Alert rows */
+  .alert-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #444;
+  }
+  .alert-row:last-child { border-bottom: none; }
+  .alert-row .al-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+
+  /* ── MAP ── */
+  #map {
+    flex: 1;
+  }
+
+  /* Status bar at very bottom — QGIS2Web style */
+  #statusbar {
+    height: 22px;
+    background: #fff;
+    border-top: 1px solid #ccc;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 10px;
+    color: #888;
+    flex-shrink: 0;
+  }
+  #statusbar span { color: #555; }
+
+  /* ── Leaflet popup — clean minimal ── */
+  .leaflet-popup-content-wrapper {
+    border-radius: 4px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+    font-family: 'Open Sans', Arial, sans-serif !important;
+    font-size: 12px !important;
+  }
+  .pop-title {
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #ddd;
+    color: #333;
+  }
+  .pop-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11px;
+  }
+  .pop-row .pk { color: #888; }
+  .pop-row .pv { color: #333; font-weight: 600; }
+  .pop-alert { color: #d32f2f; font-size: 10px; margin-top: 5px; }
+
+  /* Leaflet zoom control — default position top-left (QGIS2Web default) */
+  .leaflet-top.leaflet-left { top: 10px; left: 10px; }
+</style>
+</head>
+<body>
+
+<!-- Title bar -->
+<div id="title-bar">
+  <div>
+    <h1>Kasungu National Park — Wildlife Tracking</h1>
+    <div class="subtitle">Malawi Dept. of National Parks &amp; Wildlife &nbsp;·&nbsp; Real-time collar monitoring</div>
+  </div>
+  <div id="live-badge">
+    <div class="live-dot"></div>
+    Live &nbsp;·&nbsp; <span id="clk">--:--:--</span>
+  </div>
+</div>
+
+<!-- Main area -->
+<div id="main">
+
+  <!-- Left panel -->
+  <div id="panel">
+
+    <!-- Layers -->
+    <div class="panel-section">
+      <h3>Layers</h3>
+
+      <label class="layer-row">
+        <input type="checkbox" checked id="lyr-lion" onchange="toggleSp('lion',this)">
+        <div class="layer-circle" style="background:#e65100;"></div>
+        <span class="layer-name">Lions (14)</span>
+      </label>
+
+      <label class="layer-row">
+        <input type="checkbox" checked id="lyr-elephant" onchange="toggleSp('elephant',this)">
+        <div class="layer-circle" style="background:#6a1b9a;"></div>
+        <span class="layer-name">Elephants (32)</span>
+      </label>
+
+      <label class="layer-row">
+        <input type="checkbox" checked id="lyr-giraffe" onchange="toggleSp('giraffe',this)">
+        <div class="layer-circle" style="background:#2e7d32;"></div>
+        <span class="layer-name">Giraffes (19)</span>
+      </label>
+
+      <label class="layer-row">
+        <input type="checkbox" checked id="lyr-hippo" onchange="toggleSp('hippo',this)">
+        <div class="layer-circle" style="background:#01579b;"></div>
+        <span class="layer-name">Hippos (9)</span>
+      </label>
+
+      <label class="layer-row">
+        <input type="checkbox" checked id="lyr-trails" onchange="toggleTrails(this)">
+        <div class="layer-line" style="background:#aaa;"></div>
+        <span class="layer-name">Movement trails</span>
+      </label>
+
+      <label class="layer-row">
+        <input type="checkbox" checked id="lyr-rivers" onchange="toggleLayer('rivers',this)">
+        <div class="layer-line" style="background:#1565c0;"></div>
+        <span class="layer-name">Rivers / Lifupa Dam</span>
+      </label>
+
+      <label class="layer-row">
+        <input type="checkbox" checked id="lyr-boundary" onchange="toggleLayer('boundary',this)">
+        <div class="layer-sym" style="background:rgba(76,153,76,0.25);border:1px solid #4c994c;"></div>
+        <span class="layer-name">Park boundary</span>
+      </label>
+
+    </div>
+
+    <!-- Basemap -->
+    <div class="panel-section">
+      <h3>Basemap</h3>
+      <label class="layer-row">
+        <input type="radio" name="bm" value="osm" checked onchange="setBm('osm')">
+        <span class="layer-name">OpenStreetMap</span>
+      </label>
+      <label class="layer-row">
+        <input type="radio" name="bm" value="sat" onchange="setBm('sat')">
+        <span class="layer-name">Satellite (Esri)</span>
+      </label>
+      <label class="layer-row">
+        <input type="radio" name="bm" value="topo" onchange="setBm('topo')">
+        <span class="layer-name">OpenTopoMap</span>
+      </label>
+    </div>
+
+    <!-- Legend -->
+    <div class="panel-section">
+      <h3>Legend</h3>
+      <div class="legend-item"><div class="leg-sym" style="background:rgba(76,153,76,0.25);border:1px solid #4c994c;width:18px;height:12px;border-radius:2px;flex-shrink:0;"></div>Park boundary</div>
+      <div class="legend-item"><div class="leg-line" style="background:#1565c0;"></div>River / Dam</div>
+      <div class="legend-item"><div class="leg-circle" style="background:#e65100;"></div>Lion</div>
+      <div class="legend-item"><div class="leg-circle" style="background:#6a1b9a;"></div>Elephant</div>
+      <div class="legend-item"><div class="leg-circle" style="background:#2e7d32;"></div>Giraffe</div>
+      <div class="legend-item"><div class="leg-circle" style="background:#01579b;"></div>Hippo</div>
+      <div class="legend-item"><div class="leg-line" style="background:#999;border:none;height:2px;border-top:1px dashed #999;background:transparent;"></div>Movement trail</div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="panel-section" style="flex-shrink:0;">
+      <h3>Alerts</h3>
+      <div id="alert-list"></div>
+    </div>
+
+    <!-- Feature info -->
+    <div id="info-box">
+      <h3>Feature Info</h3>
+      <div id="info-content">
+        <div class="info-placeholder">Click a feature on the map to view details.</div>
+      </div>
+    </div>
+
+  </div><!-- /panel -->
+
+  <!-- Map -->
+  <div id="map"></div>
+
+</div><!-- /main -->
+
+<!-- Status bar -->
+<div id="statusbar">
+  <span>Lat: <span id="sLat">—</span></span>
+  <span>Lng: <span id="sLng">—</span></span>
+  <span>Zoom: <span id="sZoom">10</span></span>
+  <span id="sSelected">No feature selected</span>
+  <span style="margin-left:auto;">© OpenStreetMap contributors &nbsp;·&nbsp; Malawi DNPW</span>
+</div>
+
+<script>
+const KNP_GEOJSON={"type":"FeatureCollection","features":[{"id":"0","type":"Feature","properties":{"AREA":2358623436.332,"PERIMETER":274692.385,"EACODE":20115901,"HOUSEHOLDS":98.0,"TOTAL":385,"MALE":207,"FEMALE":178,"TA":"Kasungu NP","TA_CODE":20115,"DISTRICT":"Kasungu","DIST_CODE":201,"CODE":24,"FEATURE":901,"EA_CODE2":20115000,"NAME":"Kasungu National Park"},"geometry":{"type":"MultiPolygon","coordinates":[[[[33.00914197235175,-12.88676105977086],[32.97827858865173,-12.883454673049645],[32.97255743054616,-12.879406095602004],[32.96414225055612,-12.865075006457966],[32.94643223968969,-12.847881280773658],[32.9551275181559,-12.824889964457094],[32.94710220414944,-12.800600108829121],[32.947379377467136,-12.790048205287764],[32.93852919465311,-12.773422217951765],[32.98862607278111,-12.727659369783641],[33.00284692037496,-12.70986313583074],[33.01528916355457,-12.66496451704467],[33.04993884994499,-12.620297057241551],[33.067688596089404,-12.606140877487213],[33.093778194225976,-12.594874478699165],[33.105833573140664,-12.609944635217872],[33.112717298467714,-12.61333293637409],[33.13363164103894,-12.59898114032084],[33.15214608593043,-12.596601991053323],[33.18481480978781,-12.608310129076564],[33.178025424527,-12.635163239981965],[33.18222269813822,-12.642105377050168],[33.19117353191306,-12.634566350940416],[33.20523664271972,-12.607255290202179],[33.22720387081267,-12.598601520976446],[33.24128070961714,-12.586290806868627],[33.267704238290705,-12.543791033226887],[33.28072153338015,-12.537185438861615],[33.29749071872505,-12.535105608132524],[33.29748287321821,-12.56334666385496],[33.288819747883835,-12.581342488071732],[33.274461187346795,-12.659470078200076],[33.27540253134067,-12.682257102956074],[33.2848629306245,-12.718545049352937],[33.2949106651472,-12.735525490980747],[33.30795791722153,-12.748297134219264],[33.31024825637601,-12.758178210053769],[33.30783969420723,-12.779567165193134],[33.299736925894805,-12.789197988431836],[33.2934073744445,-12.804405979532136],[33.29610701676221,-12.820553299982965],[33.29156189628083,-12.830170805903071],[33.296737807219365,-12.843774319916488],[33.2917343854335,-12.857380175930635],[33.30081412849673,-12.87238985801352],[33.29749265403546,-12.89779457211399],[33.30763918837057,-12.896968999724262],[33.32584866239743,-12.901848082701196],[33.337557462721094,-12.897438508477729],[33.351503397177545,-12.919022998411648],[33.34525435655367,-12.974643392061909],[33.329624911575245,-12.994665885463188],[33.31407873372273,-13.00405327377437],[33.30562948474918,-13.00220962090762],[33.29774698310963,-13.004786878037688],[33.29574845738003,-13.008903549094171],[33.29921121098158,-13.028097018290595],[33.295899720054344,-13.040199804773701],[33.25776752803795,-13.069846036679483],[33.25152283847874,-13.079536804752255],[33.24253752325075,-13.10063271021967],[33.24661648937362,-13.110738439237982],[33.24593459632907,-13.120830595177559],[33.252299859554334,-13.134306886929938],[33.246443861125634,-13.138870008417733],[33.23429689937422,-13.167356340886185],[33.228624223574684,-13.19290660695848],[33.19079600007336,-13.217352405773042],[33.164953789865734,-13.221936855190116],[33.15991569205949,-13.225385260727615],[33.146529794630716,-13.224145412913133],[33.14089427582273,-13.230026230422887],[33.131342187418745,-13.229380254903898],[33.12261935853001,-13.232667031124478],[33.1080501091029,-13.242059764802377],[33.104455674726296,-13.24953943781495],[33.095535684862405,-13.246378044658503],[33.074960692472374,-13.253248203089884],[33.06364174285127,-13.263288492019925],[33.07223760321035,-13.276904245737397],[33.072192944641785,-13.292719617906188],[33.02923098573985,-13.296037740007392],[33.02197317054265,-13.307829902244437],[32.990865710350505,-13.316167875032342],[32.97468424021284,-13.329332649138728],[32.93515136605059,-13.347501008835719],[32.924314155775185,-13.356260155158012],[32.919758640271475,-13.345208858843758],[32.94692774218124,-13.268137708193295],[32.952834348002106,-13.263020795968194],[32.96972843897728,-13.262526021729169],[32.982079006422445,-13.22908784144414],[32.991080909515894,-13.222749476887762],[33.01273574314053,-13.218987607299955],[33.016200223976284,-13.212612398965817],[33.005961260878834,-13.201219194913616],[32.99460805375109,-13.17524888736966],[32.977814861140196,-13.15685532479986],[32.978763541983085,-13.133525443979762],[32.97416944073753,-13.11564773476613],[32.9741855630168,-13.10757265530148],[32.9801697110656,-13.097698610559268],[32.98050644846694,-13.079134053829064],[32.993081664941265,-13.051590701589927],[32.98367809937751,-13.02854949300823],[32.9931160307473,-13.017915692098418],[32.99680368791919,-13.002190480296354],[33.01111896862352,-12.991329948825381],[33.0103093931465,-12.974392939376308],[33.01608493416432,-12.951415021708607],[33.0167133296304,-12.929920331388564],[33.0263458829605,-12.917503806152773],[33.01716085025102,-12.893541180536785],[33.00914197235175,-12.88676105977086]],[[32.991625060653966,-12.879652044658988],[32.99162765034028,-12.879581913333821],[32.99137235177436,-12.879155759880799],[32.991625060653966,-12.879652044658988]],[[32.991874692542986,-12.880142284485578],[32.991856897342714,-12.880088005494812],[32.991625060653966,-12.879652044658988],[32.991874692542986,-12.880142284485578]],[[32.99198750826368,-12.880486394869887],[32.99202608217799,-12.880439590114124],[32.991874692542986,-12.880142284485578],[32.99198750826368,-12.880486394869887]],[[32.9920174050949,-12.880508983070303],[32.99198750826368,-12.880486394869887],[32.9919141976687,-12.880575348300834],[32.9920174050949,-12.880508983070303]],[[32.99206345940432,-12.880543778849313],[32.992043874462105,-12.880491962522601],[32.9920174050949,-12.880508983070303],[32.99206345940432,-12.880543778849313]],[[32.99236511573164,-12.88101516554181],[32.992162560278004,-12.880800282471434],[32.992181663905576,-12.88085651469757],[32.99236511573164,-12.88101516554181]],[[32.99206345940432,-12.880543778849313],[32.992159471213505,-12.880797799142977],[32.992105251206674,-12.880575354127044],[32.99206345940432,-12.880543778849313]],[[32.99244864124199,-12.881089989393415],[32.992449132422486,-12.881081449161378],[32.99236511573164,-12.88101516554181],[32.99244864124199,-12.881089989393415]],[[32.99256257736063,-12.881185751504479],[32.992708106521526,-12.881319552184332],[32.99256961780908,-12.881191668923417],[32.99256257736063,-12.881185751504479]]],[[[32.9951780713867,-12.886433200693626],[32.99512368929137,-12.886450983553157],[32.99509325634813,-12.886394998035147],[32.9951780713867,-12.886433200693626]]],[[[32.99955506892338,-12.887839293366707],[32.99949261423372,-12.887809537386715],[32.99958689591499,-12.88785049784354],[32.99955506892338,-12.887839293366707]],[[32.99955506892338,-12.887839293366707],[32.99955166359432,-12.887835284388904],[32.99954932779771,-12.887834265923358],[32.99955506892338,-12.887839293366707]]]]}}]};
+
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const COLORS = {
+  lion:     '#e65100',
+  elephant: '#6a1b9a',
+  giraffe:  '#2e7d32',
+  hippo:    '#01579b'
+};
+
+const ANIMALS = [
+  {id:'KNP-L001', nm:'Chewa',    sp:'lion',     sx:'M', e:'🦁', lat:-12.780, lng:33.050, spd:3.2, st:'Active',   bt:82, zone:'North',   fx:48},
+  {id:'KNP-L002', nm:'Tumbuka',  sp:'lion',     sx:'F', e:'🦁', lat:-12.850, lng:33.180, spd:1.8, st:'Resting',  bt:91, zone:'Central', fx:48},
+  {id:'KNP-L003', nm:'Ngoni',    sp:'lion',     sx:'M', e:'🦁', lat:-12.950, lng:33.080, spd:5.5, st:'Hunting',  bt:67, zone:'South',   fx:48},
+  {id:'KNP-L004', nm:'Yao',      sp:'lion',     sx:'F', e:'🦁', lat:-13.050, lng:33.220, spd:0.0, st:'Resting',  bt:44, zone:'South',   fx:24, al:'Low battery'},
+  {id:'KNP-L005', nm:'Lomwe',    sp:'lion',     sx:'M', e:'🦁', lat:-12.700, lng:33.150, spd:7.1, st:'Active',   bt:78, zone:'North',   fx:48},
+  {id:'KNP-L006', nm:'Sena',     sp:'lion',     sx:'F', e:'🦁', lat:-13.150, lng:33.120, spd:2.3, st:'Active',   bt:85, zone:'South',   fx:48, al:'Near boundary'},
+  {id:'KNP-E001', nm:'Kasitu',   sp:'elephant', sx:'M', e:'🐘', lat:-12.880, lng:33.140, spd:4.1, st:'Active',   bt:88, zone:'Central', fx:48},
+  {id:'KNP-E002', nm:'Dwangwa',  sp:'elephant', sx:'F', e:'🐘', lat:-12.930, lng:33.250, spd:2.9, st:'Grazing',  bt:76, zone:'East',    fx:48},
+  {id:'KNP-E003', nm:'Bua',      sp:'elephant', sx:'M', e:'🐘', lat:-13.080, lng:33.050, spd:3.7, st:'Active',   bt:92, zone:'South',   fx:48},
+  {id:'KNP-E004', nm:'Lifupa',   sp:'elephant', sx:'F', e:'🐘', lat:-12.750, lng:33.200, spd:1.5, st:'Grazing',  bt:61, zone:'North',   fx:24, al:'Low battery'},
+  {id:'KNP-E005', nm:'Mchesi',   sp:'elephant', sx:'M', e:'🐘', lat:-13.000, lng:33.300, spd:5.8, st:'Active',   bt:73, zone:'East',    fx:48},
+  {id:'KNP-G001', nm:'Mvuu',     sp:'giraffe',  sx:'M', e:'🦒', lat:-12.800, lng:33.220, spd:6.4, st:'Active',   bt:87, zone:'North',   fx:48},
+  {id:'KNP-G002', nm:'Njati',    sp:'giraffe',  sx:'F', e:'🦒', lat:-12.920, lng:33.170, spd:4.2, st:'Grazing',  bt:79, zone:'Central', fx:48},
+  {id:'KNP-G003', nm:'Kalulu',   sp:'giraffe',  sx:'M', e:'🦒', lat:-13.100, lng:33.280, spd:3.9, st:'Active',   bt:93, zone:'South',   fx:48},
+  {id:'KNP-H001', nm:'Chipeta',  sp:'hippo',    sx:'M', e:'🦛', lat:-12.870, lng:33.100, spd:0.8, st:'In Water', bt:88, zone:'River',   fx:48},
+  {id:'KNP-H002', nm:'Nkhata',   sp:'hippo',    sx:'F', e:'🦛', lat:-12.910, lng:33.090, spd:0.3, st:'In Water', bt:80, zone:'River',   fx:48},
+  {id:'KNP-H003', nm:'Lifidzi',  sp:'hippo',    sx:'M', e:'🦛', lat:-13.030, lng:33.130, spd:1.9, st:'Active',   bt:96, zone:'River',   fx:48},
+];
+
+// ── MAP SETUP ─────────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [-12.9457, 33.1358],
+  zoom: 10,
+  zoomControl: true
+});
+
+const BASEMAPS = {
+  osm:  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          {attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom:19}),
+  sat:  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          {attribution:'Tiles &copy; Esri', maxZoom:18}),
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+          {attribution:'&copy; OpenTopoMap', maxZoom:17})
+};
+let curBm = 'osm';
+BASEMAPS.osm.addTo(map);
+
+// Coordinate display
+map.on('mousemove', function(e) {
+  document.getElementById('sLat').textContent  = e.latlng.lat.toFixed(5);
+  document.getElementById('sLng').textContent  = e.latlng.lng.toFixed(5);
+});
+map.on('zoomend', function() {
+  document.getElementById('sZoom').textContent = map.getZoom();
+});
+
+// ── PARK BOUNDARY (real shapefile) ────────────────────────────────────────────
+const boundaryLayer = L.geoJSON(KNP_GEOJSON, {
+  style: {
+    color: '#4c994c',
+    weight: 2,
+    opacity: 1,
+    fillColor: '#4c994c',
+    fillOpacity: 0.12
+  }
+}).addTo(map);
+
+boundaryLayer.on('click', function(e) {
+  showInfo({
+    'Name':     'Kasungu National Park',
+    'District': 'Kasungu',
+    'Country':  'Malawi',
+    'Area':     '2,316 km²',
+    'Est.':     '1970'
+  }, 'Park Boundary', '#4c994c');
+  document.getElementById('sSelected').textContent = 'Kasungu NP boundary';
+});
+
+// ── RIVERS AND LIFUPA DAM ─────────────────────────────────────────────────────
+const riversGroup = L.layerGroup();
+
+L.polyline(
+  [[-12.62,33.08],[-12.72,33.10],[-12.80,33.11],[-12.88,33.10],[-12.97,33.12],[-13.06,33.13],[-13.18,33.16]],
+  {color:'#1565c0', weight:2.5, opacity:0.8}
+).addTo(riversGroup).bindPopup('<div class="pop-title" style="color:#1565c0">Kasitu River</div>');
+
+L.polyline(
+  [[-12.70,33.22],[-12.79,33.20],[-12.88,33.19],[-12.97,33.22],[-13.05,33.28]],
+  {color:'#1565c0', weight:2.5, opacity:0.8}
+).addTo(riversGroup).bindPopup('<div class="pop-title" style="color:#1565c0">Dwangwa River (tributary)</div>');
+
+L.circle([-12.887, 33.103], {
+  radius: 3000,
+  color: '#1565c0', weight: 1.5,
+  fillColor: '#42a5f5', fillOpacity: 0.35
+}).addTo(riversGroup)
+  .bindPopup('<div class="pop-title" style="color:#1565c0">Lifupa Dam</div>');
+
+riversGroup.addTo(map);
+
+// ── ANIMAL MARKERS AND TRAILS ─────────────────────────────────────────────────
+const LGM = {lion:L.layerGroup(), elephant:L.layerGroup(), giraffe:L.layerGroup(), hippo:L.layerGroup()};
+const LGT = {lion:L.layerGroup(), elephant:L.layerGroup(), giraffe:L.layerGroup(), hippo:L.layerGroup()};
+Object.values(LGM).forEach(g => g.addTo(map));
+Object.values(LGT).forEach(g => g.addTo(map));
+
+const MO = {};
+let trailsOn = true;
+const SPV = {lion:true, elephant:true, giraffe:true, hippo:true};
+
+// Simple circle marker — standard QGIS2Web style
+function mkMarker(a) {
+  const c = COLORS[a.sp];
+  return L.circleMarker([a.lat, a.lng], {
+    radius: a.al ? 9 : 7,
+    fillColor: c,
+    color: '#fff',
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 0.9
+  });
+}
+
+function mkPopup(a) {
+  return '<div class="pop-title">' + a.e + ' ' + a.nm + '</div>' +
+    '<div class="pop-row"><span class="pk">ID</span><span class="pv">' + a.id + '</span></div>' +
+    '<div class="pop-row"><span class="pk">Species</span><span class="pv">' + a.sp.charAt(0).toUpperCase()+a.sp.slice(1) + '</span></div>' +
+    '<div class="pop-row"><span class="pk">Sex</span><span class="pv">' + (a.sx==='M'?'Male':'Female') + '</span></div>' +
+    '<div class="pop-row"><span class="pk">Status</span><span class="pv">' + a.st + '</span></div>' +
+    '<div class="pop-row"><span class="pk">Speed</span><span class="pv">' + a.spd + ' km/h</span></div>' +
+    '<div class="pop-row"><span class="pk">Zone</span><span class="pv">' + a.zone + '</span></div>' +
+    '<div class="pop-row"><span class="pk">Battery</span><span class="pv">' + a.bt + '%</span></div>' +
+    (a.al ? '<div class="pop-alert">&#9888; ' + a.al + '</div>' : '');
+}
+
+function genTrail(a) {
+  const pts = [];
+  let lt = a.lat, ln = a.lng;
+  for (let i = 24; i >= 0; i--) {
+    lt += (Math.random() - 0.5) * 0.012;
+    ln += (Math.random() - 0.5) * 0.012;
+    pts.push([lt, ln]);
+  }
+  pts.push([a.lat, a.lng]);
+  return pts;
+}
+
+function showInfo(fields, title, color) {
+  const el = document.getElementById('info-content');
+  let html = '<div style="font-weight:600;font-size:12px;color:'+(color||'#333')+';margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #ddd;">' + title + '</div>';
+  for (const [k, v] of Object.entries(fields)) {
+    html += '<div class="info-row"><span class="info-key">' + k + '</span><span class="info-val">' + v + '</span></div>';
+  }
+  el.innerHTML = html;
+}
+
+ANIMALS.forEach(function(a) {
+  const m = mkMarker(a);
+  m.addTo(LGM[a.sp]);
+  m.bindPopup(mkPopup(a), {maxWidth: 220});
+  m.on('click', function() {
+    showInfo({
+      'ID': a.id, 'Name': a.nm,
+      'Species': a.sp.charAt(0).toUpperCase()+a.sp.slice(1),
+      'Sex': a.sx==='M'?'Male':'Female',
+      'Status': a.st, 'Speed': a.spd+' km/h',
+      'Zone': a.zone, 'Battery': a.bt+'%',
+      'Fixes/day': a.fx
+    }, a.e + ' ' + a.nm, COLORS[a.sp]);
+    document.getElementById('sSelected').textContent = a.e + ' ' + a.nm + ' (' + a.id + ')';
+  });
+  MO[a.id] = {m: m, d: a};
+
+  const trail = L.polyline(genTrail(a), {
+    color: COLORS[a.sp],
+    weight: 1.5,
+    opacity: 0.5,
+    dashArray: '4, 4'
+  });
+  LGT[a.sp].addLayer(trail);
+});
+
+// ── LAYER TOGGLES ─────────────────────────────────────────────────────────────
+const NAMED_LAYERS = {
+  boundary: boundaryLayer,
+  rivers:   riversGroup
+};
+
+function toggleSp(sp, cb) {
+  SPV[sp] = cb.checked;
+  cb.checked ? map.addLayer(LGM[sp]) : map.removeLayer(LGM[sp]);
+  if (trailsOn) {
+    cb.checked ? map.addLayer(LGT[sp]) : map.removeLayer(LGT[sp]);
+  }
+}
+
+function toggleTrails(cb) {
+  trailsOn = cb.checked;
+  ['lion','elephant','giraffe','hippo'].forEach(function(sp) {
+    if (!SPV[sp]) return;
+    trailsOn ? map.addLayer(LGT[sp]) : map.removeLayer(LGT[sp]);
+  });
+}
+
+function toggleLayer(name, cb) {
+  cb.checked ? NAMED_LAYERS[name].addTo(map) : map.removeLayer(NAMED_LAYERS[name]);
+}
+
+function setBm(key) {
+  map.removeLayer(BASEMAPS[curBm]);
+  BASEMAPS[key].addTo(map);
+  BASEMAPS[key].bringToBack();
+  curBm = key;
+}
+
+// ── ALERTS ────────────────────────────────────────────────────────────────────
+const ALERT_DATA = [
+  {c:'#d32f2f', m:'Sena (L006) near western boundary'},
+  {c:'#e65100', m:'Yao (L004) battery low — 44%'},
+  {c:'#2e7d32', m:'Kasitu herd near Lifupa Dam'},
+  {c:'#01579b', m:'All hippos in river corridor'},
+  {c:'#d32f2f', m:'Ngoni (L003) hunting — South zone'},
+  {c:'#e65100', m:'Lifupa (E004) battery low — 61%'},
+  {c:'#2e7d32', m:'17 collars reporting normally'},
+];
+let ai = 0;
+function pushAlert() {
+  const el = document.getElementById('alert-list');
+  const a = ALERT_DATA[ai % ALERT_DATA.length]; ai++;
+  const d = document.createElement('div');
+  d.className = 'alert-row';
+  d.innerHTML = '<div class="al-dot" style="background:'+a.c+'"></div><span>' + a.m + '</span>';
+  el.insertBefore(d, el.firstChild);
+  if (el.children.length > 5) el.removeChild(el.lastChild);
+}
+for (let i = 0; i < 4; i++) pushAlert();
+setInterval(pushAlert, 10000);
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function tick() {
+  document.getElementById('clk').textContent = new Date().toTimeString().slice(0,8);
+}
+setInterval(tick, 1000); tick();
+
+// ── LIVE MOVEMENT ─────────────────────────────────────────────────────────────
+setInterval(function() {
+  ANIMALS.forEach(function(a) {
+    a.lat += (Math.random() - 0.5) * 0.003;
+    a.lng += (Math.random() - 0.5) * 0.003;
+    a.spd  = Math.max(0, +(a.spd + (Math.random()-0.5)*0.5).toFixed(1));
+    if (MO[a.id]) MO[a.id].m.setLatLng([a.lat, a.lng]);
+  });
+}, 8000);
+</script>
+</body>
+</html>
